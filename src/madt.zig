@@ -31,7 +31,7 @@ pub const Madt = extern struct {
         pub fn next(self: *Iterator) ?MadtEntry {
             const hdr = next_raw(self) orelse return null;
             switch (hdr.type) {
-                _ => return .{ .unknown = hdr },
+                _ => return .{ .unknown = @ptrCast(hdr) },
                 inline else => |tag| return @unionInit(MadtEntry, @tagName(tag), @ptrCast(hdr)),
             }
         }
@@ -55,6 +55,7 @@ pub const MadtEntryType = enum(u8) {
     gic_redistributor,
     gic_interrupt_translation_service,
     multiprocessor_wakeup,
+    unknown = 0xFF,
     _,
 };
 
@@ -88,21 +89,34 @@ pub const MadtInterruptSourceFlags = packed struct(u16) {
 
 pub const MadtEntry = b: {
     const tags = std.enums.values(MadtEntryType);
-    const count = tags.len + 1;
-    var names: [count][]const u8 = undefined;
-    var enum_vals: [count]u16 = undefined;
-    var types: [count]type = undefined;
-    const attrs: [count]std.builtin.Type.UnionField.Attributes = @splat(.{});
-    names[0] = "unknown";
-    types[0] = *align(1) const MadtEntryHeader;
-    enum_vals[0] = std.math.maxInt(u16);
-    for (tags, 1..) |tag, i| {
-        names[i] = @tagName(tag);
-        types[i] = *align(1) const MadtEntryPayload(tag);
-        enum_vals[i] = @intFromEnum(tag);
+
+    var unionFields: [tags.len]std.builtin.Type.UnionField = undefined;
+
+
+
+    for (tags, 0..) |tag, i| {
+        unionFields[i] = .{
+            .name = @tagName(tag),
+            .type = *align(1) const MadtEntryPayload(tag),
+            .alignment = 8,
+        };
     }
-    const Tag = @Enum(u16, .exhaustive, &names, &enum_vals);
-    break :b @Union(.auto, Tag, &names, &types, &attrs);
+
+    //u16, .exhaustive, &names, &enum_vals);
+    break :b @Type(
+        .{
+            .@"union" = .{
+                .tag_type = tagTy: {
+                    var info = @typeInfo(MadtEntryType);
+                    info.@"enum".is_exhaustive = false;
+                    break :tagTy @Type(info);
+                },
+                .decls = &.{},
+                .fields = &unionFields,
+                .layout = .auto,
+            },
+        },
+    );
 };
 
 pub fn MadtEntryPayload(comptime t: MadtEntryType) type {

@@ -47,6 +47,8 @@ pub fn build(b: *Build) void {
         .root_source_file = b.path("src/zuacpi.zig"),
         .target = target,
         .optimize = optimize,
+        .red_zone = false,
+        .omit_frame_pointer = false,
     });
 
     var flags_list: std.ArrayList([]const u8) = std.ArrayList([]const u8).initCapacity(b.allocator, 6) catch @panic("OOM");

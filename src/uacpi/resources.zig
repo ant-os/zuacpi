@@ -1,5 +1,6 @@
 const uacpi = @import("uacpi.zig");
 const namespace = @import("namespace.zig");
+const std = @import("std");
 
 pub const ResourceType = enum(u32) {
     irq,
@@ -279,19 +280,29 @@ pub const Resource = union(ResourceType) {
 
 const ResourceNativeUnion: type = b: {
     const f = @typeInfo(Resource).@"union".fields;
-    var names: [f.len][]const u8 = undefined;
-    var types: [f.len]type = undefined;
-    var attrs: [f.len]@import("std").builtin.Type.UnionField.Attributes = undefined;
-    for (f, &names, &types, &attrs) |fld, *name, *typ, *attr| {
-        typ.* = switch (@typeInfo(fld.type)) {
-            .pointer => |p| p.child,
-            .void => *struct {},
-            else => unreachable,
+    var fields: [f.len]std.builtin.Type.UnionField = undefined;
+    for (f, &fields) |src, *target| {
+        target.* = .{
+            .name = src.name,
+            .type = switch (@typeInfo(src.type)) {
+                .pointer => |p| p.child,
+                .void => *struct {},
+                else => unreachable,
+            },
+            .alignment = @alignOf(usize),
         };
-        name.* = fld.name;
-        attr.* = .{.@"align" = @alignOf(usize)};
     }
-    break :b @Union(.@"extern", null, names, types, attrs);
+    
+    break :b @Type(
+        .{
+            .@"union" = .{
+                .layout = .@"extern",
+                .decls = &.{},
+                .tag_type = null,
+                .fields = &fields,
+            },
+        },
+    );
 };
 
 pub const ResourceNative = extern struct {
@@ -309,11 +320,11 @@ pub const ResourceNative = extern struct {
 
 pub const Resources = extern struct {
     length: usize,
-    entries: [*] align(@alignOf(usize)) u8, // actually a [*]ResourceNative but fucked up window struct indexer things apply
+    entries: [*]align(@alignOf(usize)) u8, // actually a [*]ResourceNative but fucked up window struct indexer things apply
 
     pub const Iterator = struct {
         remain_len: usize,
-        ptr: [*] align(@alignOf(usize)) u8,
+        ptr: [*]align(@alignOf(usize)) u8,
 
         pub fn next(self: *Iterator) ?Resource {
             const native: *ResourceNative = @ptrCast(self.ptr);
