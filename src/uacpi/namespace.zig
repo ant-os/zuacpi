@@ -16,13 +16,20 @@ pub const NamespaceNode = opaque {
 
     extern fn uacpi_namespace_for_each_child(
         parent: *NamespaceNode,
-        descending_cb: *const IterationCallback,
-        ascending_cb: *const IterationCallback,
-        types: uacpi.ObjectTypeBits,
+        descending_cb: ?*const IterationCallback,
+        ascending_cb: ?*const IterationCallback,
+        types: u32,
         max_depth: u32,
         user: ?*anyopaque,
     ) callconv(.c) uacpi.uacpi_status;
-    pub fn for_each_child(parent: *NamespaceNode, descending_cb: *const IterationCallback, ascending_cb: *const IterationCallback, types: uacpi.ObjectTypeBits, max_depth: u32, user: ?*anyopaque) !void {
+    pub fn for_each_child(
+        parent: *NamespaceNode,
+        descending_cb: ?*const IterationCallback,
+        ascending_cb: ?*const IterationCallback,
+        types: u32,
+        max_depth: u32,
+        user: ?*anyopaque,
+    ) !void {
         try uacpi_namespace_for_each_child(parent, descending_cb, ascending_cb, types, max_depth, user).err();
     }
 
@@ -45,7 +52,7 @@ pub const NamespaceNode = opaque {
 
 extern fn uacpi_namespace_node_next(parent: *NamespaceNode, iter: *?*NamespaceNode) callconv(.c) uacpi.uacpi_status;
 pub fn node_next(parent: *NamespaceNode, iter: *?*NamespaceNode) !?*NamespaceNode {
-    uacpi_namespace_node_next(parent, iter).err() catch |err| switch(err) {
+    uacpi_namespace_node_next(parent, iter).err() catch |err| switch (err) {
         error.NotFound => return null,
         else => return err,
     };
@@ -54,7 +61,7 @@ pub fn node_next(parent: *NamespaceNode, iter: *?*NamespaceNode) !?*NamespaceNod
 
 extern fn uacpi_namespace_node_next_typed(parent: *NamespaceNode, iter: *?*NamespaceNode, types: uacpi.ObjectTypeBits) callconv(.c) uacpi.uacpi_status;
 pub fn node_next_typed(parent: *NamespaceNode, iter: *?*NamespaceNode, types: uacpi.ObjectTypeBits) !?*NamespaceNode {
-    uacpi_namespace_node_next_typed(parent, iter, types).err() catch |err| switch(err) {
+    uacpi_namespace_node_next_typed(parent, iter, types).err() catch |err| switch (err) {
         error.NotFound => return null,
         else => return err,
     };
